@@ -1,92 +1,67 @@
-# Deploying to Railway (public, shareable link)
+# Deploying (free) — Vercel + Neon
 
-This puts the app **and** its Postgres database on Railway and gives you a
-permanent `https://<your-app>.up.railway.app` URL to share. People can then
-register and log in from any device, any time.
+This hosts the app on **Vercel** and its Postgres database on **Neon** — both
+have free plans, and Vercel doesn't sleep, so your link is always fast. You get
+a permanent `https://<your-app>.vercel.app` URL to share.
 
-The database auto-populates on first boot (48 teams, 56 fixtures, tournament +
-top-scorer markets, and one admin) — **you don't run any seed command**.
-
----
-
-## What's already set up for you
-
-- `railway.json` — tells Railway to build with Nixpacks and start with
-  `npm run start:railway`.
-- `npm run start:railway` = `prisma migrate deploy` (creates tables) →
-  `tsx prisma/bootstrap.ts` (loads markets if the DB is empty) → `next start`.
-- `prisma` and `tsx` are runtime dependencies, so migrations/bootstrap work on
-  the server.
+The database **sets itself up on deploy**: the build runs migrations and loads
+the 48 teams, 56 fixtures and all odds + one admin account. You don't run any
+seed command.
 
 ---
 
-## Option A — Deploy from GitHub (recommended, auto-redeploys on push)
+## Step 1 — Create a free database (Neon)
 
-1. **Push this project to a GitHub repo.**
-   ```bash
-   git push -u origin main         # after adding your GitHub remote
+1. Go to <https://neon.tech> and sign up (you can use your GitHub account).
+2. Create a project (any name). Neon makes a database for you.
+3. On the project page, find the **connection string**. Turn **Connection
+   pooling OFF** so you get the *direct* string, then **copy** it. It looks like:
+   ```
+   postgresql://USER:PASSWORD@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require
    ```
 
-2. **Create the Railway project.**
-   - Go to <https://railway.com> and sign in with GitHub.
-   - **New Project → Deploy from GitHub repo →** pick this repo.
-   - The first build may fail because there's no database yet — that's expected.
+## Step 2 — Deploy the app (Vercel)
 
-3. **Add Postgres.**
-   - In the project: **New → Database → Add PostgreSQL.**
-
-4. **Set variables on the app service** (the Next.js service, not the DB).
-   Open the service → **Variables** → add:
-   | Variable | Value |
+1. Go to <https://vercel.com> and sign up with **GitHub**.
+2. **Add New… → Project →** import the **FWC26betsrus** repo.
+3. Before clicking Deploy, open **Environment Variables** and add:
+   | Name | Value |
    |---|---|
-   | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (reference the Postgres service) |
-   | `STARTING_BALANCE` | `1000` |
-   | `ADMIN_PASSWORD` | a strong password (this becomes the `admin` login) |
+   | `DATABASE_URL` | the Neon string from Step 1 |
+   | `ADMIN_PASSWORD` | a password you choose (your admin login) |
+   | `STARTING_BALANCE` | `1000` (optional) |
+4. Click **Deploy** and wait ~2 minutes. The build creates the tables and loads
+   all the teams/fixtures/odds automatically (watch for
+   `[bootstrap] Done: 48 teams, 56 fixtures …` in the build log).
+5. When it finishes, Vercel shows your live URL —
+   `https://fwc26betsrus.vercel.app` (or similar). **That's the link you share.**
 
-   Do **not** set `NODE_ENV` — Nixpacks needs devDependencies to build, and
-   `next start` runs in production mode automatically.
+## Step 3 — Log in & finish setup
 
-5. **Redeploy.** Railway redeploys on the variable change. On boot it migrates,
-   bootstraps the markets, and starts. Watch **Deploy Logs** for
-   `[bootstrap] Done: 48 teams, 56 fixtures …`.
+- Visit `https://<your-url>/login` → sign in as `admin` / your `ADMIN_PASSWORD`.
+- Admin → **Matches**: fill in real kickoff times.
+- Admin → **Accounts**: reset any player's password if needed (there's no email,
+  so resets are admin-only).
 
-6. **Generate the public link.**
-   - App service → **Settings → Networking → Public Networking → Generate Domain.**
-   - You get `https://<name>.up.railway.app`. **This is the link you share.**
-   - (Optional) add a variable `APP_URL` set to that URL and redeploy.
-
-7. **Log in & lock it down.**
-   - Visit `https://<name>.up.railway.app/login` → `admin` / your `ADMIN_PASSWORD`.
-   - Admin → **Matches**: fill in real kickoff times.
-   - Admin → **Accounts**: you can reset any player's password here (there's no
-     email, so resets are admin-only).
-
-Every `git push` to the connected branch re-deploys automatically.
-
----
-
-## Option B — Deploy with the Railway CLI (no GitHub)
-
-```bash
-npm i -g @railway/cli
-railway login
-railway init                       # creates a new project
-railway add --database postgres    # add Postgres
-# set variables:
-railway variables --set STARTING_BALANCE=1000 --set ADMIN_PASSWORD=<strong-pw>
-#   and reference the DB:
-railway variables --set DATABASE_URL='${{Postgres.DATABASE_URL}}'
-railway up                         # build & deploy the current folder
-railway domain                     # generate the public URL to share
-```
+Every `git push` to GitHub auto-redeploys.
 
 ---
 
 ## Notes
 
-- **Play-money only.** No real currency, no payment integration.
-- **Change `ADMIN_PASSWORD`** before sharing — don't ship the default.
-- **Reset everything:** delete the Postgres service data (or drop the tables);
-  the next boot re-bootstraps a fresh set of markets.
-- **Demo data** (players/sample bets) is local-only via `SEED_DEMO=true` and is
-  never created on a real deployment.
+- **Free.** Vercel Hobby + Neon free tier — no card required.
+- **Play-money only.** No real currency, no payments.
+- **Reset everything:** in Neon, reset/recreate the database; the next deploy
+  re-loads a fresh set of markets.
+- **Connections:** the direct Neon string is simplest and fine for a small
+  group. If you ever get connection-limit errors under heavy traffic, switch
+  `DATABASE_URL` to Neon's *pooled* string.
+
+---
+
+## Alternative: Railway (paid, ~$5/mo, all-in-one)
+
+`railway.json` is included if you prefer Railway (it bundles app + Postgres and
+uses `npm run start:railway`). Steps: New Project → deploy this repo → add
+PostgreSQL → set `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `ADMIN_PASSWORD`,
+`STARTING_BALANCE=1000` → Settings → Networking → Generate Domain.
