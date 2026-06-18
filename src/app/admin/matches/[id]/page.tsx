@@ -71,11 +71,25 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
       {/* Live Match Center (admin-driven; no external feed) */}
       <section className="card space-y-4 p-4">
         <div>
-          <h2 className="mb-1 flex items-center gap-2 font-semibold">
-            <span className="live-dot" /> Live Match Center
-          </h2>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <span className="live-dot" /> Live Match Center
+            </h2>
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(
+                `${match.homeTeam.name} vs ${match.awayTeam.name} score`,
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary px-2.5 py-1 text-xs"
+            >
+              🔎 Look up score on Google ↗
+            </a>
+          </div>
           <p className="mb-3 text-xs text-slate-500">
-            Set the score, play status and minute. Viewers&rsquo; screens update within a few seconds.
+            Set the score, play status and minute below — viewers&rsquo; screens update within a few
+            seconds. The Google button opens a search in a new tab so you can check a real result;
+            scores aren&rsquo;t fetched automatically.
           </p>
           <LiveControls
             matchId={match.id}
