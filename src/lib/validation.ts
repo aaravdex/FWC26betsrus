@@ -203,6 +203,16 @@ export const settleMarketSchema = z.object({
   winningOutcomeId: z.string().min(1, "Pick the winning outcome"),
 });
 
+// Round of 16: which teams (outcomes) qualified — everything else loses.
+export const settleQualificationSchema = z.object({
+  qualifiedOutcomeIds: z.array(z.string().min(1)).default([]),
+});
+
+// Set a market's lock datetime (used for the Round of 16 group-stage lock).
+export const updateMarketLockSchema = z.object({
+  locksAt: z.coerce.date({ invalid_type_error: "Enter a valid date/time" }),
+});
+
 export const updateTournamentSettingsSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   startsAt: z.coerce.date(),

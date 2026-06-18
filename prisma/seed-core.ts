@@ -143,6 +143,60 @@ export const TOP_SCORERS: Array<[string, string, number]> = [
 // Admin-set odds for the catch-all option (editable in the admin panel).
 export const ANY_OTHER_ODDS = 2.0;
 
+// --- Round of 16 qualification: [team, bookmaker-friendly decimal payout] ----
+// Each team is a yes/qualifies outcome. Names use the supplied table; aliases
+// (e.g. Türkiye) resolve to the canonical team via TEAM_ALIAS.
+export const ROUND_OF_16_PAYOUTS: Array<[string, number]> = [
+  ["France", 1.09],
+  ["Spain", 1.17],
+  ["England", 1.18],
+  ["Argentina", 1.19],
+  ["Portugal", 1.2],
+  ["Germany", 1.25],
+  ["Belgium", 1.29],
+  ["Brazil", 1.32],
+  ["United States", 1.34],
+  ["Mexico", 1.4],
+  ["Norway", 1.44],
+  ["Netherlands", 1.64],
+  ["Switzerland", 1.67],
+  ["Colombia", 1.7],
+  ["Morocco", 1.82],
+  ["South Korea", 1.86],
+  ["Canada", 2.0],
+  ["Japan", 2.05],
+  ["Uruguay", 3.17],
+  ["Croatia", 3.17],
+  ["Ecuador", 3.33],
+  ["Austria", 3.33],
+  ["Senegal", 3.48],
+  ["Sweden", 3.65],
+  ["Egypt", 3.65],
+  ["Ivory Coast", 4.09],
+  ["Australia", 4.09],
+  ["Türkiye", 4.39],
+  ["Czechia", 4.68],
+  ["Scotland", 4.84],
+  ["Algeria", 4.84],
+  ["Bosnia and Herzegovina", 5.23],
+  ["Ghana", 5.51],
+  ["Paraguay", 5.79],
+  ["Iran", 6.78],
+  ["DR Congo", 8.75],
+  ["Cape Verde", 9.37],
+  ["Saudi Arabia", 9.88],
+  ["Uzbekistan", 10.95],
+  ["Panama", 10.95],
+  ["South Africa", 12.12],
+  ["Qatar", 16.24],
+  ["New Zealand", 18.18],
+  ["Tunisia", 19.76],
+  ["Jordan", 28.41],
+  ["Iraq", 39.53],
+  ["Curaçao", 90.91],
+  ["Haiti", 90.91],
+];
+
 export const slug = (s: string) =>
   s.normalize("NFD").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 16);
 
@@ -311,9 +365,57 @@ export async function seedCore(prisma: PrismaClient): Promise<SeedCoreResult> {
     matchMarkets.push(market);
   }
 
+  // Round of 16 qualification market (one yes/qualifies outcome per team).
+  await ensureRoundOf16Market(prisma);
+
   // Initial admin
   const adminPassword = process.env.ADMIN_PASSWORD ?? "admin12345";
   await createUser(prisma, "admin", adminPassword, "ADMIN");
 
   return { adminPassword, teamByName, winnerMarket, scorerMarket, matchMarkets };
+}
+
+/**
+ * Create the Round of 16 qualification market if it doesn't exist yet. Idempotent
+ * and safe to run on every deploy — used to add the market to already-seeded
+ * production databases without touching existing data. Locks at the tournament
+ * start by default; the admin can edit the lock datetime and odds afterwards.
+ */
+export async function ensureRoundOf16Market(prisma: PrismaClient) {
+  const existing = await prisma.market.findFirst({ where: { kind: "ROUND_OF_16" } });
+  if (existing) return existing;
+
+  const settings = await prisma.tournamentSettings.findUnique({ where: { id: 1 } });
+  const locksAt = settings?.startsAt ?? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  const teams = await prisma.team.findMany();
+  const byName = new Map(teams.map((t) => [t.name, t]));
+
+  const outcomes: OutcomeSeed[] = [];
+  for (const [name, payout] of ROUND_OF_16_PAYOUTS) {
+    const team = byName.get(TEAM_ALIAS[name] ?? name);
+    if (!team) {
+      // eslint-disable-next-line no-console
+      console.warn(`[round-of-16] skipping unknown team: ${name}`);
+      continue;
+    }
+    outcomes.push({ key: team.code, label: team.name, odds: payout, teamId: team.id });
+  }
+
+  return prisma.market.create({
+    data: {
+      kind: "ROUND_OF_16",
+      title: "Round of 16 — which teams qualify from the group stage?",
+      locksAt,
+      outcomes: {
+        create: outcomes.map((o) => ({
+          selectionKey: o.key,
+          label: o.label,
+          odds: new Prisma.Decimal(o.odds),
+          teamId: o.teamId,
+        })),
+      },
+    },
+    include: { outcomes: true },
+  });
 }

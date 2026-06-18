@@ -8,29 +8,33 @@
  * No demo players/bets here: a real deployment starts with a clean leaderboard.
  */
 import { PrismaClient } from "@prisma/client";
-import { seedCore, clearAll } from "./seed-core";
+import { seedCore, clearAll, ensureRoundOf16Market } from "./seed-core";
 
 const prisma = new PrismaClient();
 
 async function main() {
   const existing = await prisma.market.count();
   if (existing > 0) {
-    console.log(`[bootstrap] ${existing} markets already present — skipping seed.`);
-    return;
+    console.log(`[bootstrap] ${existing} markets already present — skipping full seed.`);
+  } else {
+    console.log("[bootstrap] Empty database — loading teams, fixtures and markets…");
+    try {
+      const core = await seedCore(prisma);
+      console.log(
+        `[bootstrap] Done: 48 teams, 56 fixtures, tournament + top-scorer markets. Admin: admin / ${core.adminPassword}`,
+      );
+    } catch (err) {
+      // Roll back any partial rows so the next boot can retry from a clean slate.
+      console.error("[bootstrap] Seed failed, clearing partial data:", err);
+      await clearAll(prisma).catch(() => {});
+      throw err;
+    }
   }
 
-  console.log("[bootstrap] Empty database — loading teams, fixtures and markets…");
-  try {
-    const core = await seedCore(prisma);
-    console.log(
-      `[bootstrap] Done: 48 teams, 56 fixtures, tournament + top-scorer markets. Admin: admin / ${core.adminPassword}`,
-    );
-  } catch (err) {
-    // Roll back any partial rows so the next boot can retry from a clean slate.
-    console.error("[bootstrap] Seed failed, clearing partial data:", err);
-    await clearAll(prisma).catch(() => {});
-    throw err;
-  }
+  // Always ensure newer markets exist — adds the Round of 16 market to
+  // already-seeded production databases without touching existing data.
+  await ensureRoundOf16Market(prisma);
+  console.log("[bootstrap] Round of 16 qualification market ready.");
 }
 
 main()

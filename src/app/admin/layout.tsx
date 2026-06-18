@@ -6,6 +6,7 @@ const adminLinks = [
   { href: "/admin/matches", label: "Matches" },
   { href: "/admin/tournament", label: "Winner" },
   { href: "/admin/top-scorer", label: "Top scorer" },
+  { href: "/admin/qualification", label: "Round of 16" },
   { href: "/admin/teams", label: "Teams & players" },
   { href: "/admin/users", label: "Accounts" },
   { href: "/admin/chat", label: "Chat" },

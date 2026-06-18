@@ -8,6 +8,7 @@ const links = [
   { href: "/live", label: "Live" },
   { href: "/tournament", label: "Winner" },
   { href: "/top-scorer", label: "Top Scorer" },
+  { href: "/qualification", label: "R16" },
   { href: "/leaderboard", label: "Leaderboard" },
 ];
 

@@ -91,6 +91,8 @@ export function marketHref(kind: string, matchId: string | null): string | null 
       return "/tournament";
     case "TOP_SCORER":
       return "/top-scorer";
+    case "ROUND_OF_16":
+      return "/qualification";
     default:
       return null;
   }

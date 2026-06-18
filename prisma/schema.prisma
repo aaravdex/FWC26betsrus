@@ -35,6 +35,7 @@ enum MarketKind {
   MATCH_WINNER      // Team A win / Draw / Team B win for a match
   TOURNAMENT_WINNER // which team wins the World Cup
   TOP_SCORER        // which player scores the most goals
+  ROUND_OF_16       // will a team qualify from the group stage (one outcome per team, each settles yes/no)
 }
 
 enum MarketStatus {

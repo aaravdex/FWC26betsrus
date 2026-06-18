@@ -244,6 +244,35 @@ export async function settleMarketByOutcome(args: {
 }
 
 /**
+ * Settle the Round of 16 qualification market. The admin supplies the set of
+ * outcomes (teams) that qualified; each team's outcome settles independently —
+ * qualified pays out stake × locked odds, not-qualified loses. Reuses the same
+ * idempotent core (atomic SETTLED claim), so settling twice never double-pays.
+ */
+export async function settleQualificationMarket(args: {
+  marketId: string;
+  qualifiedOutcomeIds: string[];
+}): Promise<SettleSummary> {
+  const { marketId, qualifiedOutcomeIds } = args;
+
+  return prisma.$transaction(async (tx) => {
+    const market = await tx.market.findUnique({
+      where: { id: marketId },
+      include: { outcomes: true },
+    });
+    if (!market) throw new HttpError(404, "Market not found");
+
+    const valid = new Set(market.outcomes.map((o) => o.id));
+    for (const id of qualifiedOutcomeIds) {
+      if (!valid.has(id)) throw new HttpError(400, "An outcome does not belong to this market");
+    }
+
+    const qualified = new Set(qualifiedOutcomeIds);
+    return settleMarketCore(tx, marketId, (o) => qualified.has(o.id));
+  });
+}
+
+/**
  * Void a market: refund every open bet's stake and mark the market settled with
  * no winners. Idempotent via the same atomic claim. Used to cancel a market.
  */
