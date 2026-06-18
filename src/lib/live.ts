@@ -58,6 +58,8 @@ export type LiveSummary = {
   suspended: boolean;
   // The viewer's own bet outcome on this match, once settled (null otherwise).
   result: MatchResult;
+  // Match-winner decimal payouts for the inline stacked-odds display.
+  odds: { home: number | null; draw: number | null; away: number | null };
 };
 
 const liveMatchInclude = {
@@ -119,22 +121,40 @@ export async function getLiveSummaries(userId?: string): Promise<LiveSummary[]> 
   const [matches, results] = await Promise.all([
     prisma.match.findMany({
       orderBy: [{ liveStatus: "asc" }, { kickoff: "asc" }],
-      include: { homeTeam: true, awayTeam: true, markets: { select: { status: true } } },
+      include: {
+        homeTeam: true,
+        awayTeam: true,
+        markets: {
+          select: {
+            kind: true,
+            status: true,
+            outcomes: { select: { selectionKey: true, odds: true } },
+          },
+        },
+      },
     }),
     userId ? getUserMatchResults(userId) : Promise.resolve({} as Record<string, MatchResult>),
   ]);
-  return matches.map((m) => ({
-    id: m.id,
-    liveStatus: m.liveStatus,
-    minute: m.minute,
-    homeScore: m.homeScore,
-    awayScore: m.awayScore,
-    kickoff: m.kickoff.toISOString(),
-    homeTeam: { name: m.homeTeam.name, code: m.homeTeam.code },
-    awayTeam: { name: m.awayTeam.name, code: m.awayTeam.code },
-    suspended: m.markets.some((mk) => mk.status === "SUSPENDED"),
-    result: results[m.id] ?? null,
-  }));
+  return matches.map((m) => {
+    const mw = m.markets.find((mk) => mk.kind === "MATCH_WINNER");
+    const oddOf = (key: string) => {
+      const o = mw?.outcomes.find((x) => x.selectionKey === key);
+      return o ? oddsToNumber(o.odds) : null;
+    };
+    return {
+      id: m.id,
+      liveStatus: m.liveStatus,
+      minute: m.minute,
+      homeScore: m.homeScore,
+      awayScore: m.awayScore,
+      kickoff: m.kickoff.toISOString(),
+      homeTeam: { name: m.homeTeam.name, code: m.homeTeam.code },
+      awayTeam: { name: m.awayTeam.name, code: m.awayTeam.code },
+      suspended: m.markets.some((mk) => mk.status === "SUSPENDED"),
+      result: results[m.id] ?? null,
+      odds: { home: oddOf("HOME"), draw: oddOf("DRAW"), away: oddOf("AWAY") },
+    };
+  });
 }
 
 /**

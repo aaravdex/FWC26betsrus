@@ -7,6 +7,7 @@ import { apiGet } from "@/lib/client";
 import { resultCardClass } from "@/lib/results";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AnimatedScore } from "@/components/AnimatedScore";
+import { OddsRows } from "@/components/OddsRows";
 
 const POLL_MS = 4000;
 
@@ -39,6 +40,13 @@ function MatchRow({ m }: { m: LiveSummary }) {
           <div className="text-xs text-slate-500">vs</div>
         )}
       </div>
+      <OddsRows
+        rows={[
+          { label: m.homeTeam.name, odds: m.odds.home },
+          { label: "Draw", odds: m.odds.draw },
+          { label: m.awayTeam.name, odds: m.odds.away },
+        ]}
+      />
     </Link>
   );
 }

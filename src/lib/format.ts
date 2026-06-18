@@ -1,15 +1,20 @@
 // Display helpers for dates and market/bet labels.
 
+// Kickoffs are stored as UTC instants but always shown in IST (Asia/Kolkata),
+// so every viewer sees the same official Indian Standard Time regardless of
+// their own locale/timezone.
 const dateTimeFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
   day: "2-digit",
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
+  hour12: true,
+  timeZone: "Asia/Kolkata",
 });
 
 export function formatKickoff(d: Date): string {
-  return dateTimeFmt.format(d);
+  return `${dateTimeFmt.format(d)} IST`;
 }
 
 /** For <input type="datetime-local"> default values (local time, no seconds). */

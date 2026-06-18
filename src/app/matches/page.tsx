@@ -9,6 +9,7 @@ import { getUserMatchResults } from "@/lib/live";
 import { resultCardClass, type MatchResult } from "@/lib/results";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FactBanner } from "@/components/FactBanner";
+import { OddsRows } from "@/components/OddsRows";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +38,6 @@ function MatchCard({ m, result }: { m: MatchListItem; result: MatchResult }) {
   const bets = m.markets.flatMap((mk) => mk.bets);
   const staked = bets.reduce((s, b) => s + b.stake, 0n);
   const settled = m.status === "SETTLED";
-  const pills = [
-    { label: m.homeTeam.code, odds: oddOf("HOME") },
-    { label: "Draw", odds: oddOf("DRAW") },
-    { label: m.awayTeam.code, odds: oddOf("AWAY") },
-  ];
 
   return (
     <Link
@@ -69,22 +65,14 @@ function MatchCard({ m, result }: { m: MatchListItem; result: MatchResult }) {
         )}
       </div>
 
-      {/* Inline match-winner odds (decimal payout) — no click needed */}
-      <div className="mt-3 grid grid-cols-3 gap-1.5">
-        {pills.map((p) => (
-          <div
-            key={p.label}
-            className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-center"
-          >
-            <div className="truncate text-[10px] uppercase tracking-wide text-slate-500">
-              {p.label}
-            </div>
-            <div className="font-mono text-sm font-semibold text-gold-soft">
-              {p.odds != null ? p.odds.toFixed(2) : "—"}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Match-winner odds: outcome name + decimal payout, stacked */}
+      <OddsRows
+        rows={[
+          { label: m.homeTeam.name, odds: oddOf("HOME") },
+          { label: "Draw", odds: oddOf("DRAW") },
+          { label: m.awayTeam.name, odds: oddOf("AWAY") },
+        ]}
+      />
 
       <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2 text-xs text-slate-500">
         <span>
