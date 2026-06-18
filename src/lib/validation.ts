@@ -62,6 +62,67 @@ export const placeBetSchema = z.object({
   stake: stakeSchema,
 });
 
+// Chat -----------------------------------------------------------------------
+
+export const CHAT_MAX_LEN = 500;
+
+export const chatMessageSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, "Type a message")
+    .max(CHAT_MAX_LEN, `Keep it under ${CHAT_MAX_LEN} characters`),
+});
+
+// Live Match Center ----------------------------------------------------------
+
+export const updateLiveSchema = z.object({
+  liveStatus: z.enum(["SCHEDULED", "LIVE", "HALFTIME", "FULLTIME"]).optional(),
+  minute: z.coerce.number().int().min(0).max(130).nullable().optional(),
+  homeScore: z.coerce.number().int().min(0).max(99).nullable().optional(),
+  awayScore: z.coerce.number().int().min(0).max(99).nullable().optional(),
+});
+
+export const addMatchEventSchema = z.object({
+  type: z.enum([
+    "KICKOFF",
+    "GOAL",
+    "OWN_GOAL",
+    "PENALTY_SCORED",
+    "PENALTY_MISSED",
+    "YELLOW_CARD",
+    "RED_CARD",
+    "SUBSTITUTION",
+    "INJURY",
+    "VAR",
+    "HALFTIME",
+    "FULLTIME",
+    "NOTE",
+  ]),
+  minute: z.coerce.number().int().min(0).max(130).nullable().optional(),
+  teamId: z.string().min(1).nullable().optional(),
+  description: z.string().trim().max(200).optional(),
+});
+
+export const marketStatusSchema = z.object({
+  status: z.enum(["OPEN", "SUSPENDED"]),
+});
+
+// BetSmart AI ----------------------------------------------------------------
+
+export const assistantSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(2000),
+      }),
+    )
+    .min(1)
+    .max(30),
+  matchId: z.string().min(1).nullable().optional(),
+});
+
 // Admin: accounts ------------------------------------------------------------
 
 export const updateRoleSchema = z.object({

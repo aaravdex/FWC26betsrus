@@ -39,8 +39,34 @@ enum MarketKind {
 
 enum MarketStatus {
   OPEN
+  SUSPENDED // admin paused betting (reversible) — shows a "betting paused" overlay
   LOCKED
   SETTLED
+}
+
+// Live play state for the Match Center scoreboard (separate from betting status).
+enum MatchLiveStatus {
+  SCHEDULED
+  LIVE
+  HALFTIME
+  FULLTIME
+}
+
+// Admin-appended match timeline events. No external feed — admin enters these.
+enum MatchEventType {
+  KICKOFF
+  GOAL
+  OWN_GOAL
+  PENALTY_SCORED
+  PENALTY_MISSED
+  YELLOW_CARD
+  RED_CARD
+  SUBSTITUTION
+  INJURY
+  VAR
+  HALFTIME
+  FULLTIME
+  NOTE
 }
 
 // Result of a single selection once its market is settled.
@@ -87,6 +113,7 @@ model User {
   sessions      Session[]
   bets          Bet[]
   ledgerEntries LedgerEntry[]
+  chatMessages  ChatMessage[]
 }
 
 model Session {
@@ -123,10 +150,11 @@ model Team {
   eliminated Boolean  @default(false)
   createdAt  DateTime @default(now())
 
-  homeMatches Match[]   @relation("HomeTeam")
-  awayMatches Match[]   @relation("AwayTeam")
+  homeMatches Match[]      @relation("HomeTeam")
+  awayMatches Match[]      @relation("AwayTeam")
   players     Player[]
   outcomes    Outcome[] // tournament-winner selections pointing at this team
+  matchEvents MatchEvent[]
 }
 
 model Player {
@@ -148,15 +176,34 @@ model Match {
   awayTeam   Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
   kickoff    DateTime // seeded as an editable placeholder; admin sets real time
   status     MatchStatus @default(SCHEDULED)
-  // Final score, null until settled.
+  // Live Match Center (admin-driven; no external feed).
+  liveStatus MatchLiveStatus @default(SCHEDULED)
+  minute     Int? // admin-set match minute while live
+  // Current score. Admin updates these live; settlement reads the final values.
   homeScore Int?
   awayScore Int?
   settledAt DateTime?
   createdAt DateTime    @default(now())
 
   markets Market[]
+  events  MatchEvent[]
 
   @@index([kickoff])
+}
+
+// One admin-entered timeline event for a match (newest-first feed).
+model MatchEvent {
+  id          String         @id @default(cuid())
+  matchId     String
+  match       Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  type        MatchEventType
+  minute      Int?
+  teamId      String? // which team the event relates to (optional)
+  team        Team?          @relation(fields: [teamId], references: [id])
+  description String? // optional admin note, e.g. scorer name
+  createdAt   DateTime       @default(now())
+
+  @@index([matchId])
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +247,10 @@ model Outcome {
   // Decimal payout multiplier locked onto a bet at placement time. A winning
   // stake returns stake * odds in total. Supplied values reach 50000.00.
   odds Decimal @db.Decimal(12, 2)
+  // Previous odds value + when it changed — used purely to render a green-up /
+  // red-down arrow when an admin edits the odds. No simulated movement.
+  previousOdds  Decimal?  @db.Decimal(12, 2)
+  oddsUpdatedAt DateTime?
 
   // Optional links for tournament-level selections.
   teamId   String?
@@ -255,4 +306,22 @@ model LedgerEntry {
 
   @@index([userId])
   @@index([betId])
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboard chat (real-time via client polling)
+// ---------------------------------------------------------------------------
+
+model ChatMessage {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Raw text only. Rendered as plain text (React escapes it) — never as HTML.
+  body String
+  // Admin soft-delete: row is kept for audit; body is hidden in the UI.
+  deletedAt   DateTime?
+  deletedById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([createdAt])
 }

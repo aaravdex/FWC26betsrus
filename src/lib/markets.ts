@@ -15,6 +15,7 @@ export function marketBettingClosed(market: LockCheckMarket, now = new Date()): 
 
 export function lockReason(market: LockCheckMarket, now = new Date()): string | null {
   if (market.status === "SETTLED") return "This market is settled";
+  if (market.status === "SUSPENDED") return "Betting paused";
   if (market.status === "LOCKED") return "This market is locked";
   if (market.locksAt.getTime() <= now.getTime()) return "Betting has closed";
   return null;

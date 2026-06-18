@@ -18,21 +18,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!market) throw new HttpError(404, "Market not found");
     if (market.status === "SETTLED") throw new HttpError(409, "Cannot edit odds on a settled market");
 
-    const valid = new Set(market.outcomes.map((o) => o.id));
+    const byId = new Map(market.outcomes.map((o) => [o.id, o]));
     for (const u of odds) {
-      if (!valid.has(u.outcomeId)) throw new HttpError(400, "An outcome does not belong to this market");
+      if (!byId.has(u.outcomeId)) throw new HttpError(400, "An outcome does not belong to this market");
     }
 
-    await prisma.$transaction(
-      odds.map((u) =>
+    // Only write outcomes whose value actually changed. Record the prior value +
+    // timestamp so the UI can show a green-up / red-down arrow vs the previous
+    // odds. Already-placed bets are untouched (they locked their own odds).
+    const now = new Date();
+    const updates = [];
+    for (const u of odds) {
+      const current = byId.get(u.outcomeId)!;
+      const next = new Prisma.Decimal(u.odds);
+      if (current.odds.equals(next)) continue;
+      updates.push(
         prisma.outcome.update({
           where: { id: u.outcomeId },
-          data: { odds: new Prisma.Decimal(u.odds) },
+          data: { odds: next, previousOdds: current.odds, oddsUpdatedAt: now },
         }),
-      ),
-    );
+      );
+    }
+    if (updates.length > 0) await prisma.$transaction(updates);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, changed: updates.length });
   } catch (err) {
     return errorResponse(err);
   }

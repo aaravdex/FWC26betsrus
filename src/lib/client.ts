@@ -37,3 +37,29 @@ export async function apiPatch<T = unknown>(url: string, body?: unknown): Promis
     return { ok: false, error: "Network error — please try again" };
   }
 }
+
+export async function apiGet<T = unknown>(url: string): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: (json as { error?: string }).error ?? `Request failed (${res.status})` };
+    }
+    return { ok: true, data: json as T };
+  } catch {
+    return { ok: false, error: "Network error — please try again" };
+  }
+}
+
+export async function apiDelete<T = unknown>(url: string): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(url, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: (json as { error?: string }).error ?? `Request failed (${res.status})` };
+    }
+    return { ok: true, data: json as T };
+  } catch {
+    return { ok: false, error: "Network error — please try again" };
+  }
+}

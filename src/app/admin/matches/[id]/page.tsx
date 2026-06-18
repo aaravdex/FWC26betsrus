@@ -9,6 +9,9 @@ import { BetActivity } from "@/components/BetActivity";
 import { OddsEditor } from "@/components/admin/OddsEditor";
 import { SettleMatchForm } from "@/components/admin/SettleMatchForm";
 import { MatchLockControls } from "@/components/admin/MatchLockControls";
+import { LiveControls } from "@/components/admin/LiveControls";
+import { AddEventForm } from "@/components/admin/AddEventForm";
+import { MarketSuspendToggle } from "@/components/admin/MarketSuspendToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +20,26 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
 
   const match = await prisma.match.findUnique({
     where: { id },
-    include: { homeTeam: true, awayTeam: true, markets: { include: marketInclude } },
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+      events: { orderBy: { createdAt: "desc" } },
+      markets: { include: marketInclude },
+    },
   });
   if (!match) notFound();
 
   const markets = match.markets;
   const settled = match.status === "SETTLED";
+  const teamName = (teamId: string | null) =>
+    teamId == null ? null : teamId === match.homeTeamId ? match.homeTeam.name : match.awayTeam.name;
+  const eventRows = match.events.map((e) => ({
+    id: e.id,
+    type: e.type,
+    minute: e.minute,
+    teamName: teamName(e.teamId),
+    description: e.description,
+  }));
 
   return (
     <div className="space-y-6">
@@ -37,18 +54,53 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
             {match.homeTeam.name} <span className="text-slate-500">vs</span> {match.awayTeam.name}
           </h1>
         </div>
-        <div className="flex items-center gap-4">
-          {settled && (
+        <div className="flex items-center gap-3">
+          {(match.liveStatus !== "SCHEDULED" || settled) && (
             <div className="text-center">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Full time</div>
-              <div className="font-mono text-2xl">
-                {match.homeScore} – {match.awayScore}
+              <div className="text-xs uppercase tracking-wide text-slate-500">Score</div>
+              <div className="font-mono text-2xl text-gold-soft">
+                {match.homeScore ?? 0} – {match.awayScore ?? 0}
               </div>
             </div>
           )}
+          <StatusBadge status={match.liveStatus} />
           <StatusBadge status={match.status} />
         </div>
       </header>
+
+      {/* Live Match Center (admin-driven; no external feed) */}
+      <section className="card space-y-4 p-4">
+        <div>
+          <h2 className="mb-1 flex items-center gap-2 font-semibold">
+            <span className="live-dot" /> Live Match Center
+          </h2>
+          <p className="mb-3 text-xs text-slate-500">
+            Set the score, play status and minute. Viewers&rsquo; screens update within a few seconds.
+          </p>
+          <LiveControls
+            matchId={match.id}
+            homeName={match.homeTeam.name}
+            awayName={match.awayTeam.name}
+            initial={{
+              liveStatus: match.liveStatus,
+              minute: match.minute,
+              homeScore: match.homeScore,
+              awayScore: match.awayScore,
+            }}
+          />
+        </div>
+        <div className="border-t border-white/10 pt-4">
+          <h2 className="mb-3 font-semibold">Timeline events</h2>
+          <AddEventForm
+            matchId={match.id}
+            teams={[
+              { id: match.homeTeamId, name: match.homeTeam.name },
+              { id: match.awayTeamId, name: match.awayTeam.name },
+            ]}
+            events={eventRows}
+          />
+        </div>
+      </section>
 
       {!settled && (
         <section className="card space-y-4 p-4">
@@ -78,7 +130,10 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
             <section key={market.id} className="card p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-semibold">{market.title}</h3>
-                <StatusBadge status={market.status} />
+                <div className="flex items-center gap-2">
+                  <MarketSuspendToggle marketId={market.id} status={market.status} />
+                  <StatusBadge status={market.status} />
+                </div>
               </div>
 
               {market.status === "SETTLED" ? (
@@ -86,7 +141,7 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
                   {view.outcomes.map((o) => (
                     <li key={o.id} className="flex items-center justify-between text-sm">
                       <span>
-                        {o.label} <span className="font-mono text-accent">{formatOddsNum(o.odds)}</span>
+                        {o.label} <span className="font-mono text-accent-soft">{formatOddsNum(o.odds)}</span>
                       </span>
                       <StatusBadge status={o.result} />
                     </li>

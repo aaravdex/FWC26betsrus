@@ -8,6 +8,7 @@ const adminLinks = [
   { href: "/admin/top-scorer", label: "Top scorer" },
   { href: "/admin/teams", label: "Teams & players" },
   { href: "/admin/users", label: "Accounts" },
+  { href: "/admin/chat", label: "Chat" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

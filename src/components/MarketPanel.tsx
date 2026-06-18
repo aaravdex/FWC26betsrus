@@ -26,9 +26,15 @@ export function MarketPanel({ market, signedIn, balance }: Props) {
 
       <BetBox
         marketId={market.id}
-        outcomes={market.outcomes.map((o) => ({ id: o.id, label: o.label, odds: o.odds }))}
+        outcomes={market.outcomes.map((o) => ({
+          id: o.id,
+          label: o.label,
+          odds: o.odds,
+          previousOdds: o.previousOdds,
+        }))}
         locked={market.locked}
         lockLabel={market.lockLabel}
+        suspended={market.status === "SUSPENDED"}
         signedIn={signedIn}
         balance={balance}
       />

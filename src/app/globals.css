@@ -8,40 +8,90 @@
 
 body {
   @apply bg-pitch-950 text-slate-100 antialiased;
-  background-image: radial-gradient(1200px 600px at 50% -10%, rgba(34, 197, 94, 0.08), transparent 60%);
+  /* Charcoal black base with deep midnight-navy + electric-blue gradients. */
+  background-image:
+    radial-gradient(900px 500px at 12% -8%, rgba(37, 99, 235, 0.14), transparent 60%),
+    radial-gradient(1000px 600px at 100% 0%, rgba(59, 130, 246, 0.08), transparent 55%),
+    linear-gradient(180deg, #070b15 0%, #05070d 40%, #05070d 100%);
+  background-attachment: fixed;
   min-height: 100vh;
 }
 
+/* Premium thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.22); border-radius: 9999px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.4); }
+
 @layer components {
+  /* Frosted glass card with soft glow border + shadow. */
   .card {
-    @apply rounded-xl border border-white/10 bg-pitch-900/70 shadow-lg shadow-black/20;
+    @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-glass backdrop-blur-xl;
   }
+  .card-hover {
+    @apply transition duration-200 hover:border-accent/30 hover:bg-white/[0.06] hover:shadow-glow;
+  }
+  .glass {
+    @apply border border-white/10 bg-white/[0.04] backdrop-blur-xl;
+  }
+
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
-           transition focus:outline-none focus:ring-2 focus:ring-accent/60 disabled:cursor-not-allowed
-           disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold
+           transition duration-200 focus:outline-none focus:ring-2 focus:ring-accent/60
+           disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-accent text-pitch-950 hover:bg-accent-soft;
+    @apply btn bg-accent text-white shadow-glow hover:bg-accent-soft hover:-translate-y-px active:translate-y-0;
+  }
+  .btn-gold {
+    @apply btn bg-gradient-to-b from-gold-soft to-gold text-pitch-950 shadow-glow-gold hover:brightness-110;
   }
   .btn-secondary {
-    @apply btn border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10;
+    @apply btn border border-white/15 bg-white/5 text-slate-100 hover:border-white/25 hover:bg-white/10;
   }
   .btn-danger {
     @apply btn border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20;
   }
+
   .input {
-    @apply w-full rounded-lg border border-white/10 bg-pitch-850 px-3 py-2 text-sm text-slate-100
-           placeholder:text-slate-500 focus:border-accent/50 focus:outline-none focus:ring-1
-           focus:ring-accent/50;
+    @apply w-full rounded-xl border border-white/10 bg-pitch-900/60 px-3 py-2 text-sm text-slate-100
+           placeholder:text-slate-500 backdrop-blur transition focus:border-accent/60
+           focus:outline-none focus:ring-2 focus:ring-accent/30;
   }
   .label {
-    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400;
+    @apply mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400;
   }
   .badge {
-    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }
   .table-cell {
-    @apply px-3 py-2 text-sm;
+    @apply px-3 py-2.5 text-sm;
   }
+
+  /* Odds pill — gold value on glass, the premium "value" highlight. */
+  .odds-pill {
+    @apply inline-flex items-center rounded-lg border border-gold/30 bg-gold/10 px-2 py-0.5
+           font-mono text-sm font-semibold text-gold-soft;
+  }
+
+  /* Cosmetic risk labels (derived openly from odds — not a forecast). */
+  .risk-low { @apply badge border border-up/30 bg-up/10 text-up; }
+  .risk-medium { @apply badge border border-gold/30 bg-gold/10 text-gold-soft; }
+  .risk-high { @apply badge border border-down/30 bg-down/10 text-down; }
+
+  /* Live indicator dot. */
+  .live-dot { @apply inline-block h-2 w-2 rounded-full bg-down animate-livePulse; }
+
+  /* Section heading accent rule. */
+  .rule { @apply h-px w-full bg-gradient-to-r from-accent/40 via-white/10 to-transparent; }
 }
+
+/* Subtle entrance for stacked sections. */
+.stagger > * { animation: slideUp 0.4s ease-out both; }
+.stagger > *:nth-child(2) { animation-delay: 0.04s; }
+.stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.stagger > *:nth-child(4) { animation-delay: 0.12s; }
+.stagger > *:nth-child(5) { animation-delay: 0.16s; }

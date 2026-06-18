@@ -11,6 +11,7 @@ export type OutcomeView = {
   id: string;
   label: string;
   odds: number;
+  previousOdds: number | null;
   result: string;
 };
 
@@ -68,6 +69,7 @@ export function toMarketView(market: MarketWithBets, now = new Date()): MarketVi
       id: o.id,
       label: o.label,
       odds: oddsToNumber(o.odds),
+      previousOdds: o.previousOdds ? oddsToNumber(o.previousOdds) : null,
       result: o.result,
     })),
     bets,

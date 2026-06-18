@@ -4,22 +4,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { apiPost } from "@/lib/client";
-import { formatPoints, formatOddsNum, returnForStake } from "@/lib/points";
+import { formatPoints, returnForStake } from "@/lib/points";
+import { riskFromOdds } from "@/lib/risk";
+import { OddsValue } from "@/components/OddsValue";
 
-type OutcomeView = { id: string; label: string; odds: number };
+type OutcomeView = { id: string; label: string; odds: number; previousOdds?: number | null };
 
 type Props = {
   marketId: string;
   outcomes: OutcomeView[];
   locked: boolean;
   lockLabel?: string | null;
+  suspended?: boolean;
   signedIn: boolean;
   balance: bigint;
 };
 
 type Msg = { type: "ok" | "err"; text: string } | null;
 
-export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props) {
+export function BetBox({ outcomes, locked, lockLabel, suspended, signedIn, balance }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [stakeRaw, setStakeRaw] = useState("");
@@ -34,11 +37,12 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
     [selected, stake, stakeValid],
   );
   const tooMuch = stakeValid && BigInt(stake) > balance;
+  const selectedRisk = selected ? riskFromOdds(selected.odds) : null;
 
   if (!signedIn) {
     return (
-      <div className="rounded-lg border border-white/10 bg-pitch-850/60 p-3 text-sm text-slate-400">
-        <Link href="/login" className="text-accent hover:underline">
+      <div className="glass rounded-xl p-3 text-sm text-slate-400">
+        <Link href="/login" className="text-accent-soft hover:underline">
           Sign in
         </Link>{" "}
         to place a bet.
@@ -53,7 +57,7 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
     if (tooMuch) return setMsg({ type: "err", text: "Stake is more points than you hold." });
 
     setPending(true);
-    const res = await apiPost<{ newBalance: string; potentialReturn: string }>("/api/bets", {
+    const res = await apiPost<{ newBalance: string }>("/api/bets", {
       outcomeId: selected.id,
       stake,
     });
@@ -71,7 +75,7 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
       router.refresh();
     } else {
       setMsg({ type: "err", text: res.error });
-      router.refresh(); // re-sync lock state if betting just closed
+      router.refresh();
     }
   }
 
@@ -80,6 +84,7 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
       <div className="grid gap-2 sm:grid-cols-3">
         {outcomes.map((o) => {
           const active = o.id === selectedId;
+          const risk = riskFromOdds(o.odds);
           return (
             <button
               key={o.id}
@@ -87,25 +92,42 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
               disabled={locked}
               onClick={() => setSelectedId(active ? null : o.id)}
               className={[
-                "flex items-center justify-between rounded-lg border px-3 py-2 text-left transition",
+                "flex flex-col gap-2 rounded-xl border px-3 py-2.5 text-left transition",
                 locked
-                  ? "cursor-not-allowed border-white/10 bg-pitch-850/40 opacity-60"
+                  ? "cursor-not-allowed border-white/10 bg-white/[0.02] opacity-60"
                   : active
-                    ? "border-accent bg-accent/15"
-                    : "border-white/10 bg-pitch-850 hover:border-white/25",
+                    ? "border-accent bg-accent/10 shadow-glow"
+                    : "border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06]",
               ].join(" ")}
             >
-              <span className="text-sm font-medium">{o.label}</span>
-              <span className="font-mono text-sm text-accent">{formatOddsNum(o.odds)}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{o.label}</span>
+                <OddsValue odds={o.odds} previousOdds={o.previousOdds} />
+              </div>
+              <span className={`${risk.className} self-start`} title={risk.explanation}>
+                {risk.level} risk
+              </span>
             </button>
           );
         })}
       </div>
 
       {locked ? (
-        <p className="text-sm text-amber-300">{lockLabel ?? "Betting is closed."}</p>
+        suspended ? (
+          <div className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
+            <span>⏸</span>
+            <span>
+              <span className="font-semibold">Betting paused.</span> An admin temporarily suspended
+              this market — it’ll reopen shortly.
+            </span>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
+            {lockLabel ?? "Betting is closed."}
+          </p>
+        )
       ) : (
-        <div className="rounded-lg border border-white/10 bg-pitch-850/60 p-3">
+        <div className="glass rounded-xl p-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="grow">
               <label className="label">Stake (points)</label>
@@ -136,17 +158,27 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
                 Max
               </button>
             </div>
-            <button type="button" className="btn-primary" disabled={pending || !selected || !stakeValid || tooMuch} onClick={confirm}>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={pending || !selected || !stakeValid || tooMuch}
+              onClick={confirm}
+            >
               {pending ? "Placing…" : "Place bet"}
             </button>
           </div>
 
-          <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-slate-400">
               {selected ? (
                 <>
                   Pick: <span className="text-slate-200">{selected.label}</span> @{" "}
-                  <span className="font-mono text-accent">{formatOddsNum(selected.odds)}</span>
+                  <OddsValue odds={selected.odds} previousOdds={selected.previousOdds} />
+                  {selectedRisk && (
+                    <span className={`${selectedRisk.className} ml-2`} title={selectedRisk.explanation}>
+                      {selectedRisk.level} risk
+                    </span>
+                  )}
                 </>
               ) : (
                 "Select an outcome above"
@@ -154,7 +186,7 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
             </span>
             <span className="text-slate-400">
               Potential return:{" "}
-              <span className="font-mono text-slate-100">{formatPoints(potentialReturn)}</span>
+              <span className="font-mono text-gold-soft">{formatPoints(potentialReturn)}</span>
               {potentialReturn > 0 && (
                 <span className="text-slate-500"> (profit {formatPoints(potentialReturn - stake)})</span>
               )}
@@ -165,7 +197,7 @@ export function BetBox({ outcomes, locked, lockLabel, signedIn, balance }: Props
       )}
 
       {msg && (
-        <p className={`text-sm ${msg.type === "ok" ? "text-accent" : "text-red-300"}`}>{msg.text}</p>
+        <p className={`text-sm ${msg.type === "ok" ? "text-up" : "text-down"}`}>{msg.text}</p>
       )}
     </div>
   );
