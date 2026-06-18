@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { LiveSummary } from "@/lib/live";
 import { apiGet } from "@/lib/client";
+import { resultCardClass } from "@/lib/results";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AnimatedScore } from "@/components/AnimatedScore";
 
@@ -14,12 +15,14 @@ function MatchRow({ m }: { m: LiveSummary }) {
   const min =
     m.liveStatus === "LIVE" ? (m.minute != null ? `${m.minute}'` : "Live") : "";
   return (
-    <Link href={`/matches/${m.id}`} className="card card-hover block p-4">
+    <Link href={`/matches/${m.id}`} className={`card card-hover block p-4 ${resultCardClass(m.result)}`}>
       <div className="mb-2 flex items-center justify-between">
         <StatusBadge status={m.liveStatus} />
         <span className="text-xs text-slate-500">
           {min}
           {m.suspended && <span className="ml-2 text-gold-soft">⏸ paused</span>}
+          {m.result === "won" && <span className="ml-2 font-medium text-up">✓ won</span>}
+          {m.result === "lost" && <span className="ml-2 font-medium text-down">✗ lost</span>}
         </span>
       </div>
       <div className="flex items-center justify-between gap-3">

@@ -6,8 +6,8 @@ import { errorResponse } from "@/lib/errors";
 // Poll endpoint for the Live Match Center hub (compact list of all matches).
 export async function GET() {
   try {
-    await requireApiUser();
-    const summaries = await getLiveSummaries();
+    const user = await requireApiUser();
+    const summaries = await getLiveSummaries(user.id);
     return NextResponse.json({ matches: summaries });
   } catch (err) {
     return errorResponse(err);

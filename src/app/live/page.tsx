@@ -6,8 +6,8 @@ import { FactBanner } from "@/components/FactBanner";
 export const dynamic = "force-dynamic";
 
 export default async function LivePage() {
-  await requireUser();
-  const matches = await getLiveSummaries();
+  const user = await requireUser();
+  const matches = await getLiveSummaries(user.id);
   const factSeed = Math.floor(Date.now() / 7000) + 9;
 
   return (

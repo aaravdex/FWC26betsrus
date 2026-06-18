@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { oddsToNumber } from "@/lib/money";
+import type { MatchResult } from "@/lib/results";
 
 // Serializable view models for the Live Match Center. Built server-side and
 // consumed by both the initial server render and the polling client component.
@@ -55,6 +56,8 @@ export type LiveSummary = {
   homeTeam: { name: string; code: string };
   awayTeam: { name: string; code: string };
   suspended: boolean;
+  // The viewer's own bet outcome on this match, once settled (null otherwise).
+  result: MatchResult;
 };
 
 const liveMatchInclude = {
@@ -112,11 +115,14 @@ export async function getLiveMatch(matchId: string): Promise<LiveMatchView | nul
   };
 }
 
-export async function getLiveSummaries(): Promise<LiveSummary[]> {
-  const matches = await prisma.match.findMany({
-    orderBy: [{ liveStatus: "asc" }, { kickoff: "asc" }],
-    include: { homeTeam: true, awayTeam: true, markets: { select: { status: true } } },
-  });
+export async function getLiveSummaries(userId?: string): Promise<LiveSummary[]> {
+  const [matches, results] = await Promise.all([
+    prisma.match.findMany({
+      orderBy: [{ liveStatus: "asc" }, { kickoff: "asc" }],
+      include: { homeTeam: true, awayTeam: true, markets: { select: { status: true } } },
+    }),
+    userId ? getUserMatchResults(userId) : Promise.resolve({} as Record<string, MatchResult>),
+  ]);
   return matches.map((m) => ({
     id: m.id,
     liveStatus: m.liveStatus,
@@ -127,5 +133,27 @@ export async function getLiveSummaries(): Promise<LiveSummary[]> {
     homeTeam: { name: m.homeTeam.name, code: m.homeTeam.code },
     awayTeam: { name: m.awayTeam.name, code: m.awayTeam.code },
     suspended: m.markets.some((mk) => mk.status === "SUSPENDED"),
+    result: results[m.id] ?? null,
   }));
+}
+
+/**
+ * The logged-in user's own settled bet outcome per match, derived from their bet
+ * records. Rule for multiple bets on one match: green ("won") if ANY bet won,
+ * otherwise red ("lost") if any bet lost. Matches not present here are neutral
+ * (no bet, only open/void bets, or not yet settled).
+ */
+export async function getUserMatchResults(userId: string): Promise<Record<string, MatchResult>> {
+  const bets = await prisma.bet.findMany({
+    where: { userId, status: { in: ["WON", "LOST"] }, market: { matchId: { not: null } } },
+    select: { status: true, market: { select: { matchId: true } } },
+  });
+  const map: Record<string, MatchResult> = {};
+  for (const b of bets) {
+    const matchId = b.market.matchId;
+    if (!matchId) continue;
+    if (b.status === "WON") map[matchId] = "won";
+    else if (map[matchId] !== "won") map[matchId] = "lost"; // won takes priority over lost
+  }
+  return map;
 }
