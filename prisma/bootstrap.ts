@@ -8,7 +8,7 @@
  * No demo players/bets here: a real deployment starts with a clean leaderboard.
  */
 import { PrismaClient } from "@prisma/client";
-import { seedCore, clearAll, ensureRoundOf16Market } from "./seed-core";
+import { seedCore, clearAll, ensureRoundOf16Market, ensureGroupStageOpeners } from "./seed-core";
 
 const prisma = new PrismaClient();
 
@@ -35,6 +35,9 @@ async function main() {
   // already-seeded production databases without touching existing data.
   await ensureRoundOf16Market(prisma);
   console.log("[bootstrap] Round of 16 qualification market ready.");
+
+  const openers = await ensureGroupStageOpeners(prisma);
+  console.log(`[bootstrap] Group-stage opener fixtures ensured (${openers} created).`);
 }
 
 main()

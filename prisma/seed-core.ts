@@ -197,6 +197,28 @@ export const ROUND_OF_16_PAYOUTS: Array<[string, number]> = [
   ["Haiti", 90.91],
 ];
 
+// Group-stage opening fixtures (Groups A–H matchday 1) that weren't in the
+// original Match Odds table. [home, away, IST kickoff]. Created with placeholder
+// match-winner odds the admin then edits — same defaults as admin match-create.
+export const GROUP_STAGE_OPENERS: Array<[string, string, string]> = [
+  ["Mexico", "South Africa", "2026-06-12T00:30:00+05:30"],
+  ["South Korea", "Czechia", "2026-06-12T07:30:00+05:30"],
+  ["Canada", "Bosnia and Herzegovina", "2026-06-13T00:30:00+05:30"],
+  ["United States", "Paraguay", "2026-06-13T06:30:00+05:30"],
+  ["Qatar", "Switzerland", "2026-06-14T00:30:00+05:30"],
+  ["Brazil", "Morocco", "2026-06-14T03:30:00+05:30"],
+  ["Haiti", "Scotland", "2026-06-14T06:30:00+05:30"],
+  ["Australia", "Türkiye", "2026-06-14T09:30:00+05:30"],
+  ["Germany", "Curaçao", "2026-06-14T22:30:00+05:30"],
+  ["Netherlands", "Japan", "2026-06-15T01:30:00+05:30"],
+  ["Ivory Coast", "Ecuador", "2026-06-15T04:30:00+05:30"],
+  ["Sweden", "Tunisia", "2026-06-15T07:30:00+05:30"],
+  ["Spain", "Cape Verde", "2026-06-15T21:30:00+05:30"],
+  ["Belgium", "Egypt", "2026-06-16T00:30:00+05:30"],
+  ["Saudi Arabia", "Uruguay", "2026-06-16T03:30:00+05:30"],
+  ["Iran", "New Zealand", "2026-06-16T06:30:00+05:30"],
+];
+
 export const slug = (s: string) =>
   s.normalize("NFD").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 16);
 
@@ -367,6 +389,8 @@ export async function seedCore(prisma: PrismaClient): Promise<SeedCoreResult> {
 
   // Round of 16 qualification market (one yes/qualifies outcome per team).
   await ensureRoundOf16Market(prisma);
+  // Group-stage opening fixtures not in the original odds table.
+  await ensureGroupStageOpeners(prisma);
 
   // Initial admin
   const adminPassword = process.env.ADMIN_PASSWORD ?? "admin12345";
@@ -418,4 +442,54 @@ export async function ensureRoundOf16Market(prisma: PrismaClient) {
     },
     include: { outcomes: true },
   });
+}
+
+/**
+ * Create the group-stage opening fixtures (with their match-winner markets) if
+ * they don't already exist. Idempotent and safe to run on every deploy — it
+ * skips any pairing already present, so it won't duplicate matches or touch
+ * existing data/bets. Odds are placeholders for the admin to set.
+ */
+export async function ensureGroupStageOpeners(prisma: PrismaClient): Promise<number> {
+  const teams = await prisma.team.findMany();
+  const byName = new Map(teams.map((t) => [t.name, t]));
+  const existing = await prisma.match.findMany({ include: { homeTeam: true, awayTeam: true } });
+  const existingKeys = new Set(existing.map((m) => `${m.homeTeam.name}|${m.awayTeam.name}`));
+
+  let created = 0;
+  for (const [homeTok, awayTok, iso] of GROUP_STAGE_OPENERS) {
+    const home = byName.get(TEAM_ALIAS[homeTok] ?? homeTok);
+    const away = byName.get(TEAM_ALIAS[awayTok] ?? awayTok);
+    if (!home || !away) {
+      // eslint-disable-next-line no-console
+      console.warn(`[openers] skipping unknown team(s): ${homeTok} vs ${awayTok}`);
+      continue;
+    }
+    if (existingKeys.has(`${home.name}|${away.name}`)) continue; // already present
+
+    const kickoff = new Date(iso);
+    await prisma.match.create({
+      data: {
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        kickoff,
+        markets: {
+          create: {
+            kind: "MATCH_WINNER",
+            title: `Match winner — ${home.name} vs ${away.name}`,
+            locksAt: kickoff,
+            outcomes: {
+              create: [
+                { selectionKey: "HOME", label: `${home.name} win`, odds: new Prisma.Decimal(2.0) },
+                { selectionKey: "DRAW", label: "Draw", odds: new Prisma.Decimal(3.2) },
+                { selectionKey: "AWAY", label: `${away.name} win`, odds: new Prisma.Decimal(3.8) },
+              ],
+            },
+          },
+        },
+      },
+    });
+    created += 1;
+  }
+  return created;
 }
