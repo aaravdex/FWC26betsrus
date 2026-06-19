@@ -56,6 +56,9 @@ export async function verifyCredentials(input: {
   if (!user || !ok) {
     throw new HttpError(401, "Incorrect username or password");
   }
+  if (user.bannedAt) {
+    throw new HttpError(403, "This account has been disabled. Contact an admin.");
+  }
   return user;
 }
 
@@ -65,4 +68,16 @@ export async function setUserPassword(userId: string, newPassword: string): Prom
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   // Invalidate existing sessions so a reset actually locks the old holder out.
   await prisma.session.deleteMany({ where: { userId } });
+}
+
+/** Admin-only: ban (disable) or un-ban an account. Keeps all their data. */
+export async function setUserBanned(userId: string, banned: boolean): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { bannedAt: banned ? new Date() : null },
+  });
+  if (banned) {
+    // Force-logout everywhere so the block takes effect immediately.
+    await prisma.session.deleteMany({ where: { userId } });
+  }
 }

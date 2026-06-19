@@ -196,6 +196,9 @@ export async function settleMatch(args: {
     if (match.status === "SETTLED") {
       throw new HttpError(409, "This match is already settled");
     }
+    if (match.status === "CANCELLED") {
+      throw new HttpError(409, "This match was cancelled — it can't be settled");
+    }
 
     const matchWinnerKey =
       homeScore > awayScore ? "HOME" : homeScore < awayScore ? "AWAY" : "DRAW";
@@ -308,6 +311,72 @@ export async function voidMarket(
     }
 
     return { refunded: bets.length, pointsRefunded };
+  });
+}
+
+// --- Match lifecycle: cancel / postpone -------------------------------------
+
+/**
+ * Cancel a match: void every one of its (non-settled) markets — refunding all
+ * open stakes through the ledger — and mark the match CANCELLED. Bets and the
+ * match row are preserved; nothing is hard-deleted. Returns the voided market
+ * ids so the caller can fire refund notifications.
+ */
+export async function cancelMatch(
+  matchId: string,
+): Promise<{ voidedMarketIds: string[]; refunded: number; pointsRefunded: bigint }> {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { markets: true },
+  });
+  if (!match) throw new HttpError(404, "Match not found");
+  if (match.status === "CANCELLED") throw new HttpError(409, "This match is already cancelled");
+
+  const voidedMarketIds: string[] = [];
+  let refunded = 0;
+  let pointsRefunded = 0n;
+  for (const market of match.markets) {
+    if (market.status === "SETTLED") continue; // already paid/voided — leave as-is
+    const r = await voidMarket(market.id);
+    voidedMarketIds.push(market.id);
+    refunded += r.refunded;
+    pointsRefunded += r.pointsRefunded;
+  }
+
+  await prisma.match.update({ where: { id: matchId }, data: { status: "CANCELLED" } });
+  return { voidedMarketIds, refunded, pointsRefunded };
+}
+
+/**
+ * Postpone a match. With no new kickoff the match is marked POSTPONED and
+ * betting stays closed until it is rescheduled. With a new kickoff the match is
+ * rescheduled: kickoff + the match-winner market's lock time move to the new
+ * time and betting reopens (status back to SCHEDULED). Open bets are kept.
+ */
+export async function postponeMatch(args: {
+  matchId: string;
+  kickoff?: Date;
+}): Promise<{ rescheduled: boolean }> {
+  const { matchId, kickoff } = args;
+  return prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new HttpError(404, "Match not found");
+    if (match.status === "SETTLED") throw new HttpError(409, "A settled match can't be postponed");
+
+    if (kickoff) {
+      await tx.match.update({
+        where: { id: matchId },
+        data: { status: "SCHEDULED", kickoff },
+      });
+      await tx.market.updateMany({
+        where: { matchId, kind: "MATCH_WINNER" },
+        data: { locksAt: kickoff },
+      });
+      return { rescheduled: true };
+    }
+
+    await tx.match.update({ where: { id: matchId }, data: { status: "POSTPONED" } });
+    return { rescheduled: false };
   });
 }
 

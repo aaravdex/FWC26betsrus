@@ -49,6 +49,10 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!session || session.expiresAt < new Date()) {
     return null;
   }
+  // A banned account is treated as logged-out everywhere (data is preserved).
+  if (session.user.bannedAt) {
+    return null;
+  }
   return session.user;
 }
 

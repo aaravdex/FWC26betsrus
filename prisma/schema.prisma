@@ -29,6 +29,8 @@ enum MatchStatus {
   SCHEDULED // betting open until kickoff
   LOCKED    // kickoff passed / manually locked — no new bets
   SETTLED   // result entered, bets paid
+  CANCELLED // match cancelled — open bets voided & refunded
+  POSTPONED // match postponed — betting closed until rescheduled
 }
 
 enum MarketKind {
@@ -109,12 +111,15 @@ model User {
   // always written inside the same transaction as the ledger entry that
   // changes it, so it stays exactly equal to SUM(ledger.amount).
   balance   BigInt   @default(0)
+  // Set when an admin bans/disables the account — blocks login, data is kept.
+  bannedAt  DateTime?
   createdAt DateTime @default(now())
 
   sessions      Session[]
   bets          Bet[]
   ledgerEntries LedgerEntry[]
   chatMessages  ChatMessage[]
+  notifications Notification[]
 }
 
 model Session {
@@ -177,6 +182,7 @@ model Match {
   awayTeam   Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
   kickoff    DateTime // seeded as an editable placeholder; admin sets real time
   status     MatchStatus @default(SCHEDULED)
+  venue      String? // optional stadium/city; shown only if present
   // Live Match Center (admin-driven; no external feed).
   liveStatus MatchLiveStatus @default(SCHEDULED)
   minute     Int? // admin-set match minute while live
@@ -325,4 +331,26 @@ model ChatMessage {
   createdAt   DateTime  @default(now())
 
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// In-app notifications (no email/push). Generated from real app events.
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SETTLEMENT | RANK | KICKOFF_SOON | ANNOUNCEMENT (free string, no enum churn)
+  type  String
+  title String
+  body  String
+  href  String? // optional deep link, e.g. /matches/<id>
+  // For idempotent generation (e.g. "settled:<marketId>", "kickoff:<matchId>").
+  dedupeKey String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
 }

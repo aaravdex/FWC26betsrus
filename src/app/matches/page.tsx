@@ -2,14 +2,16 @@ import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { formatKickoff, relativeToNow, matchStatusLabel } from "@/lib/format";
+import { formatKickoff, relativeToNow } from "@/lib/format";
 import { formatPoints } from "@/lib/points";
 import { oddsToNumber } from "@/lib/money";
 import { getUserMatchResults } from "@/lib/live";
 import { resultCardClass, type MatchResult } from "@/lib/results";
-import { StatusBadge } from "@/components/StatusBadge";
+import { matchDisplayStatus } from "@/lib/matchStatus";
 import { FactBanner } from "@/components/FactBanner";
 import { OddsRows } from "@/components/OddsRows";
+import { MatchStatusBadge } from "@/components/MatchStatusBadge";
+import { Countdown } from "@/components/Countdown";
 
 export const dynamic = "force-dynamic";
 
@@ -38,15 +40,22 @@ function MatchCard({ m, result }: { m: MatchListItem; result: MatchResult }) {
   const bets = m.markets.flatMap((mk) => mk.bets);
   const staked = bets.reduce((s, b) => s + b.stake, 0n);
   const settled = m.status === "SETTLED";
+  const display = matchDisplayStatus(m);
+  const isUpcoming = display.key === "upcoming";
 
   return (
     <Link
       href={`/matches/${m.id}`}
       className={`card block p-4 transition hover:border-white/25 ${resultCardClass(result)}`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs text-slate-400">{formatKickoff(m.kickoff)}</span>
-        <StatusBadge status={m.status} />
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs text-slate-400">{formatKickoff(m.kickoff)}</div>
+          {m.venue && (
+            <div className="mt-0.5 truncate text-[11px] text-slate-500">📍 {m.venue}</div>
+          )}
+        </div>
+        <MatchStatusBadge match={m} />
       </div>
       <div className="flex items-center justify-between gap-2">
         <div className="space-y-1">
@@ -59,11 +68,16 @@ function MatchCard({ m, result }: { m: MatchListItem; result: MatchResult }) {
             <div>{m.awayScore}</div>
           </div>
         ) : (
-          <div className="text-right text-xs text-slate-500">
-            {matchStatusLabel(m.status)} · {relativeToNow(m.kickoff)}
-          </div>
+          <div className="text-right text-xs text-slate-500">{relativeToNow(m.kickoff)}</div>
         )}
       </div>
+
+      {/* Live countdown to kickoff while betting is still open (item 4). */}
+      {isUpcoming && (
+        <div className="mt-2 rounded-lg border border-accent/20 bg-accent/[0.06] px-2.5 py-1.5 text-center text-xs font-medium text-accent-soft">
+          <Countdown to={m.kickoff.toISOString()} />
+        </div>
+      )}
 
       {/* Match-winner odds: outcome name + decimal payout, stacked */}
       <OddsRows

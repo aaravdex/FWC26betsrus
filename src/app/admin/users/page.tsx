@@ -5,6 +5,8 @@ import { formatPoints } from "@/lib/points";
 import { formatKickoff } from "@/lib/format";
 import { UserRoleControls } from "@/components/admin/UserRoleControls";
 import { PasswordResetControl } from "@/components/admin/PasswordResetControl";
+import { BanControl } from "@/components/admin/BanControl";
+import { AnnounceForm } from "@/components/admin/AnnounceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +28,8 @@ export default async function AdminUsersPage() {
         </p>
       </header>
 
+      <AnnounceForm />
+
       <div className="card overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -35,6 +39,7 @@ export default async function AdminUsersPage() {
               <th className="table-cell font-medium text-right">Bets</th>
               <th className="table-cell font-medium text-right">Balance</th>
               <th className="table-cell font-medium">Role</th>
+              <th className="table-cell font-medium">Status</th>
               <th className="table-cell font-medium">Password</th>
             </tr>
           </thead>
@@ -61,6 +66,25 @@ export default async function AdminUsersPage() {
                       {u.role}
                     </span>
                     <UserRoleControls userId={u.id} role={u.role} isSelf={u.id === me?.id} />
+                  </div>
+                </td>
+                <td className="table-cell">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`badge ${
+                        u.bannedAt
+                          ? "border border-down/30 bg-down/10 text-down"
+                          : "border border-up/30 bg-up/10 text-up"
+                      }`}
+                    >
+                      {u.bannedAt ? "Disabled" : "Active"}
+                    </span>
+                    <BanControl
+                      userId={u.id}
+                      banned={u.bannedAt != null}
+                      isSelf={u.id === me?.id}
+                      isAdmin={u.role === "ADMIN"}
+                    />
                   </div>
                 </td>
                 <td className="table-cell">

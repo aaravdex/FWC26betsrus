@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { formatPoints } from "@/lib/money";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const links = [
   { href: "/matches", label: "Fixtures" },
@@ -58,6 +59,7 @@ export async function Nav() {
         <div className="ml-auto flex items-center gap-3">
           {user ? (
             <>
+              <NotificationBell />
               <Link
                 href={`/players/${user.id}`}
                 className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 transition hover:border-gold/30"
@@ -77,7 +79,10 @@ export async function Nav() {
         </div>
       </nav>
       <div className="border-t border-white/5 bg-accent/[0.04] py-1 text-center text-[11px] text-slate-400">
-        Points only — no real money · all balances are fictional “points” · for fun among friends
+        Points only — no real money · all balances are fictional “points” · for fun among friends ·{" "}
+        <Link href="/rules" className="text-accent-soft hover:underline">
+          Rules &amp; Fair Play
+        </Link>
       </div>
     </header>
   );

@@ -219,6 +219,31 @@ export const updateTournamentSettingsSchema = z.object({
   startingBalance: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
 });
 
+// Admin: match lifecycle (cancel / postpone) --------------------------------
+
+export const cancelMatchSchema = z.object({
+  reason: z.string().trim().max(200).optional(),
+});
+
+// Postpone: optionally reschedule to a new kickoff; otherwise just mark it.
+export const postponeMatchSchema = z.object({
+  kickoff: z.coerce.date({ invalid_type_error: "Enter a valid date/time" }).optional(),
+  reason: z.string().trim().max(200).optional(),
+});
+
+// Admin: ban / disable a player (data is preserved) --------------------------
+
+export const banUserSchema = z.object({
+  banned: z.boolean(),
+});
+
+// Admin: broadcast announcement to the notification centre -------------------
+
+export const announceSchema = z.object({
+  title: z.string().trim().min(1, "Add a title").max(120),
+  body: z.string().trim().min(1, "Add a message").max(500),
+});
+
 // Admin: manual ledger adjustment -------------------------------------------
 
 export const adjustBalanceSchema = z.object({

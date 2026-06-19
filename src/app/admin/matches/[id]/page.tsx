@@ -9,6 +9,7 @@ import { BetActivity } from "@/components/BetActivity";
 import { OddsEditor } from "@/components/admin/OddsEditor";
 import { SettleMatchForm } from "@/components/admin/SettleMatchForm";
 import { MatchLockControls } from "@/components/admin/MatchLockControls";
+import { MatchLifecycleControls } from "@/components/admin/MatchLifecycleControls";
 import { LiveControls } from "@/components/admin/LiveControls";
 import { AddEventForm } from "@/components/admin/AddEventForm";
 import { MarketSuspendToggle } from "@/components/admin/MarketSuspendToggle";
@@ -31,6 +32,7 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
 
   const markets = match.markets;
   const settled = match.status === "SETTLED";
+  const cancelled = match.status === "CANCELLED";
   const teamName = (teamId: string | null) =>
     teamId == null ? null : teamId === match.homeTeamId ? match.homeTeam.name : match.awayTeam.name;
   const eventRows = match.events.map((e) => ({
@@ -126,13 +128,27 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
               kickoffLocal={toDateTimeLocalValue(match.kickoff)}
             />
           </div>
+          {!cancelled && (
+            <div className="border-t border-white/10 pt-4">
+              <h2 className="mb-1 font-semibold">Enter result</h2>
+              <p className="mb-3 text-xs text-slate-500">
+                Entering the final score settles the match-winner market and pays winners through the
+                ledger. Idempotent — settling twice won’t pay twice.
+              </p>
+              <SettleMatchForm matchId={match.id} homeName={match.homeTeam.name} awayName={match.awayTeam.name} />
+            </div>
+          )}
           <div className="border-t border-white/10 pt-4">
-            <h2 className="mb-1 font-semibold">Enter result</h2>
+            <h2 className="mb-1 font-semibold">Cancel or postpone</h2>
             <p className="mb-3 text-xs text-slate-500">
-              Entering the final score settles the match-winner market and pays winners through the
-              ledger. Idempotent — settling twice won’t pay twice.
+              Cancelling voids the match-winner market and refunds every open stake through the
+              ledger. Postponing closes betting until you reschedule. Bets and the match are kept.
             </p>
-            <SettleMatchForm matchId={match.id} homeName={match.homeTeam.name} awayName={match.awayTeam.name} />
+            <MatchLifecycleControls
+              matchId={match.id}
+              status={match.status}
+              kickoffLocal={toDateTimeLocalValue(match.kickoff)}
+            />
           </div>
         </section>
       )}
